@@ -18,6 +18,8 @@ env:
   # Tag as given, e.g. "v0.1.0". Must match the version in client/package.json,
   # client/src-tauri/tauri.conf.json and client/src-tauri/Cargo.toml.
   RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  # GHCR image names must be fully lowercase.
+  IMAGE_REPO: ghcr.io/lofismusk/crack-saves/server
 
 jobs:
   client:
@@ -83,7 +85,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # GHCR image names must be fully lowercase.
       - name: Build & push server image
         uses: docker/build-push-action@v6
         with:
@@ -91,5 +92,5 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository | lower }}/server:${{ env.RELEASE_TAG }}
-            ghcr.io/${{ github.repository | lower }}/server:latest
+            ${{ env.IMAGE_REPO }}:${{ env.RELEASE_TAG }}
+            ${{ env.IMAGE_REPO }}:latest
