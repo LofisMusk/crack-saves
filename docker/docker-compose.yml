@@ -1,3 +1,17 @@
+# Standalone server. To front it with Traefik instead of publishing port 8090,
+# drop the `ports:` block and add labels + external network:
+#
+#   service: ...
+#     labels:
+#       subdomain: saves
+#       traefik.http.services.saves.loadbalancer.server.port: "8090"
+#     networks: [default, proxy]
+#   networks:
+#     proxy:
+#       external: true
+#
+# then reach the API at http://saves.home (or your domain).
+
 services:
   cracked-saves:
     build:
