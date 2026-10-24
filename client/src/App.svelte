@@ -26,7 +26,12 @@
   let loading = true;
   let loadError: string | null = null;
   let view: View = { kind: "dashboard" };
-  let toasts: { id: number; message: string; tone: "info" | "ok" | "error" }[] = [];
+  let toasts: {
+    id: number;
+    message: string;
+    tone: "info" | "ok" | "error";
+    onClick?: () => void;
+  }[] = [];
   let toastId = 0;
 
   let runningMatches: Map<string, boolean> = new Map(); // gameId -> running
@@ -34,9 +39,9 @@
 
   const cleanup: (() => void)[] = [];
 
-  function toast(message: string, tone: "info" | "ok" | "error" = "info") {
+  function toast(message: string, tone: "info" | "ok" | "error" = "info", onClick?: () => void) {
     const id = ++toastId;
-    toasts = [...toasts, { id, message, tone }];
+    toasts = [...toasts, { id, message, tone, onClick }];
     setTimeout(() => {
       toasts = toasts.filter((t) => t.id !== id);
     }, 6000);
@@ -82,7 +87,10 @@
           nowRunning.add(m.game_id);
           if (!knownRunningGames.has(m.game_id)) {
             knownRunningGames.add(m.game_id);
-            toast(`Game detected: ${m.game_name}`, "info");
+            const gameId = m.game_id;
+            toast(`Game detected: ${m.game_name} — click to open`, "info", () => {
+              view = { kind: "game", gameId };
+            });
           }
         }
         runningMatches = new Map(matches.filter((m) => m.game_id).map((m) => [m.game_id!, true]));
@@ -172,7 +180,24 @@
 </div>
 
 {#each toasts as t (t.id)}
-  <div class="toast" class:ok={t.tone === "ok"} class:error={t.tone === "error"}>{t.message}</div>
+  <div
+    class="toast"
+    class:ok={t.tone === "ok"}
+    class:error={t.tone === "error"}
+    class:clickable={!!t.onClick}
+    role={t.onClick ? "button" : undefined}
+    tabindex={t.onClick ? 0 : undefined}
+    onclick={() => {
+      t.onClick?.();
+      toasts = toasts.filter((x) => x.id !== t.id);
+    }}
+    onkeydown={(e) => {
+      if (e.key === "Enter" && t.onClick) {
+        t.onClick();
+        toasts = toasts.filter((x) => x.id !== t.id);
+      }
+    }}
+  >{t.message}</div>
 {/each}
 
 <style>
@@ -275,6 +300,12 @@
   }
   .toast.error {
     border-color: rgba(255, 107, 107, 0.5);
+  }
+  .toast.clickable {
+    cursor: pointer;
+  }
+  .toast.clickable:hover {
+    border-color: var(--accent);
   }
   @keyframes slide-in {
     from {
