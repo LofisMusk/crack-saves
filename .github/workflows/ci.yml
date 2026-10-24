@@ -33,16 +33,14 @@ jobs:
   client-build:
     name: Client (${{ matrix.os }})
     needs: server-test
+    # Native arch per runner (macos-latest is arm64). No cross-compilation in CI.
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
-            target: x86_64-apple-darwin
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
           - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +64,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          project-path: client
-          target: ${{ matrix.target }}
-          # Native bundles are platform-specific; keep it light for CI smoke builds.
-          args: ${{ runner.os == 'Linux' && '--bundles app deb' || '--bundles app' }}
+          projectPath: client
+          # No --bundles override: build the platform-default bundles (dmg / nsis / deb+appimage).
+          release: false
