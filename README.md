@@ -93,6 +93,37 @@ npm run tauri build    # release bundle for your platform
    Changed files are uploaded automatically when *Auto-sync* is on; you can always
    upload/restore individual files from the game's detail view.
 
+## Releases & versioning
+
+Releases are driven by **git tags**: pushing `vX.Y.Z` (or running the *Release*
+workflow manually) builds and uploads:
+
+- desktop client bundles for macOS (`.app.tar.gz`), Windows (`.exe`) and Linux
+  (`*.deb`, `*.AppImage`) to a GitHub Release, and
+- the server image to **GitHub Container Registry**:
+
+```sh
+docker run -d \
+  --name cracked-saves \
+  -p 8090:8090 \
+  -e CS_API_TOKEN="$(openssl rand -hex 16)" \
+  -v cracked-saves-data:/data \
+  ghcr.io/lofismusk/crack-saves/server:v0.1.0
+```
+
+(`:latest` is tagged alongside each release.)
+
+**Making a release:** keep the version in sync in these three files, commit, then tag:
+
+1. `client/package.json` — `version`
+2. `client/src-tauri/tauri.conf.json` — `version`
+3. `client/src-tauri/Cargo.toml` — `package.version`
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
 ## Notes & limitations (v1)
 
 - Whole-file uploads only (no chunking / delta sync).
