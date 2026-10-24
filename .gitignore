@@ -1,0 +1,24 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node
+node_modules/
+dist/
+*.log
+
+# Rust / Tauri
+target/
+client/src-tauri/target/
+
+# Go
+server/server
+*.test
+*.out
+
+# Runtime data (saves, sqlite)
+data/
+*.db
+*.sqlite3

@@ -1,0 +1,20 @@
+services:
+  cracked-saves:
+    build:
+      context: ../server
+      dockerfile: ../docker/Dockerfile
+    image: cracked-saves/server:latest
+    container_name: cracked-saves
+    ports:
+      - "8090:8090"
+    environment:
+      # Leave empty to disable auth (trusted LAN). Set a random string to enable.
+      CS_API_TOKEN: ${CS_API_TOKEN:-}
+      CS_DATA_DIR: /data
+      CS_PORT: 8090
+    volumes:
+      - cracked-saves-data:/data
+    restart: unless-stopped
+
+volumes:
+  cracked-saves-data:
