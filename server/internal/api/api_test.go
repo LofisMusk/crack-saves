@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 
@@ -146,6 +147,53 @@ func TestGameAndSaveLifecycle(t *testing.T) {
 	resp, _ = do(t, client, http.MethodPut, base+"/api/games/unknown/saves/..", bytes.NewReader(content))
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("traversal upload: got %d want 400", resp.StatusCode)
+	}
+}
+
+func TestSaveFilenameWithSpacesAndSymbols(t *testing.T) {
+	server := httptest.NewServer(newTestServer(t))
+	defer server.Close()
+
+	content := []byte("spacey save")
+	resp, data := do(t, server.Client(), http.MethodPost, server.URL+"/api/games", bytes.NewReader([]byte(`{"name":"Symbolic","exe_pattern":"s.exe"}`)))
+	var game struct{ ID string }
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create: got %d body=%s", resp.StatusCode, data)
+	}
+	if err := json.Unmarshal(data, &game); err != nil {
+		t.Fatalf("decode game: %v (body=%s)", err, data)
+	}
+
+	name := "My Save #1 (2025).sav"
+	resp, data = do(t, server.Client(), http.MethodPut,
+		server.URL+"/api/games/"+game.ID+"/saves/"+url.PathEscape(name), bytes.NewReader(content))
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		t.Fatalf("upload: got %d body=%s", resp.StatusCode, data)
+	}
+
+	resp, data = do(t, server.Client(), http.MethodGet,
+		server.URL+"/api/games/"+game.ID+"/saves/"+url.PathEscape(name), nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("download: got %d body=%s", resp.StatusCode, data)
+	}
+	if string(data) != string(content) {
+		t.Fatalf("round-trip mismatch: %q vs %q", data, content)
+	}
+
+	// escaped traversal (client url_encodes, chi keeps %2F encoded) -> 400
+	resp, _ = do(t, server.Client(), http.MethodPut,
+		server.URL+"/api/games/"+game.ID+"/saves/"+url.PathEscape("../../evil.sav"), bytes.NewReader(content))
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("escaped traversal: got %d want 400", resp.StatusCode)
+	}
+
+	// forbidden windows chars -> 400
+	for _, bad := range []string{"a:b.sav", `a?b.sav`, "a|b.sav"} {
+		resp, _ = do(t, server.Client(), http.MethodPut,
+			server.URL+"/api/games/"+game.ID+"/saves/"+url.PathEscape(bad), bytes.NewReader(content))
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("upload %q: got %d want 400", bad, resp.StatusCode)
+		}
 	}
 }
 

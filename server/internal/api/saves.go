@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,8 +44,8 @@ func (a *API) listSaves(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) uploadSave(w http.ResponseWriter, r *http.Request) {
 	gameID := chi.URLParam(r, "id")
-	filename := sanitizeFilename(chi.URLParam(r, "name"))
-	if filename == "" {
+	filename, ok := decodeFilenameParam(r)
+	if !ok {
 		a.writeError(w, http.StatusBadRequest, "invalid save filename")
 		return
 	}
@@ -107,8 +108,8 @@ func (a *API) uploadSave(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) downloadSave(w http.ResponseWriter, r *http.Request) {
 	gameID := chi.URLParam(r, "id")
-	filename := sanitizeFilename(chi.URLParam(r, "name"))
-	if filename == "" {
+	filename, ok := decodeFilenameParam(r)
+	if !ok {
 		a.writeError(w, http.StatusBadRequest, "invalid save filename")
 		return
 	}
@@ -137,17 +138,37 @@ func (a *API) downloadSave(w http.ResponseWriter, r *http.Request) {
 
 // sanitizeFilename allows [A-Za-z0-9._-] and "/" for subfolders; rejects
 // empty parts, "." and ".." to avoid traversal and hidden-file surprises.
+// sanitizeFilename validates a (possibly nested) save file name. It rejects the
+// characters that are invalid on at least one major OS plus empty/"."/".." path
+// segments (traversal), so unicode and spaces in names such as "Save #1 (2025).sav"
+// pass through unchanged.
+// decodeFilenameParam decodes the {name} URL parameter. chi leaves %2F encoded
+// (to keep it from breaking the route segment), so a client-escaped traversal
+// like "..%2F..%2Fevil.sav" arrives still escaped — unescape first, then sanitize.
+func decodeFilenameParam(r *http.Request) (string, bool) {
+	raw := chi.URLParam(r, "name")
+	name, err := url.PathUnescape(raw)
+	if err != nil {
+		return "", false
+	}
+	filename := sanitizeFilename(name)
+	return filename, filename != ""
+}
+
 func sanitizeFilename(name string) string {
 	name = strings.ReplaceAll(name, "\\", "/")
+	if name == "" || strings.ContainsRune(name, '\u0000') {
+		return ""
+	}
 	for _, part := range strings.Split(name, "/") {
-		if part == "" || part == "." || part == ".." {
+		switch part {
+		case ".", "..":
 			return ""
 		}
 		for _, c := range part {
-			switch {
-			case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-			case c == '.' || c == '_' || c == '-':
-			default:
+			// Forbidden on Windows (and separators elsewhere): / : * ? " < > |
+			if c == '/' || c == ':' || c == '*' || c == '?' || c == '"' ||
+				c == '<' || c == '>' || c == '|' {
 				return ""
 			}
 		}
